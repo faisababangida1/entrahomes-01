@@ -25,38 +25,76 @@ type MessageThread = {
   propertyImage: string
   lastMessage: string
   updatedAt: string
+  unread?: boolean
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
-
+const API_BASE_URL = 'http://localhost:4000'
 const categories = ['All', 'Apartments', 'Houses', 'Studios', 'Short Let'] as const
 const tabs = ['home', 'search', 'add', 'messages', 'profile'] as const
+
+const seedProperties: Property[] = [
+  {
+    id: 'p1',
+    title: 'Modern Studio',
+    description:
+      'Meticulously designed modern studio with open concept layout, premium finishes, and oversized windows that bring in natural light throughout the day.',
+    price: 1800,
+    location: 'Brooklyn, New York',
+    type: 'Studio',
+    bedrooms: 1,
+    bathrooms: 1,
+    furnished: 'Unfurnished',
+    images: [
+      'https://images.unsplash.com/photo-1493666438817-866a91353ca9?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80',
+    ],
+    landlordPhoneE164: '+17185551234',
+    updatedAt: '2m ago',
+  },
+  {
+    id: 'p2',
+    title: 'Downtown Loft',
+    description: 'Spacious loft in the heart of downtown with high ceilings, smart lock entry, and private laundry.',
+    price: 2500,
+    location: 'Manhattan, New York',
+    type: 'Apartment',
+    bedrooms: 2,
+    bathrooms: 2,
+    furnished: 'Furnished',
+    images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80'],
+    landlordPhoneE164: '+16465559876',
+    updatedAt: 'Yesterday',
+  },
+]
+
+const seedThreads: MessageThread[] = [
+  { id: 'm1', propertyId: 'p1', propertyTitle: 'Luxury Penthouse', propertyImage: seedProperties[0].images[0], lastMessage: 'Is this still available?', updatedAt: '2m ago', unread: true },
+  { id: 'm2', propertyId: 'p2', propertyTitle: 'Downtown Loft', propertyImage: seedProperties[1].images[0], lastMessage: 'We can schedule a viewing for Friday.', updatedAt: 'Yesterday' },
+  { id: 'm3', propertyId: 'p1', propertyTitle: 'Riverside Studio', propertyImage: 'https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=900&q=80', lastMessage: 'Thank you for the application.', updatedAt: 'Mon' },
+]
 
 export function App() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>('home')
   const [selectedCategory, setSelectedCategory] = useState<(typeof categories)[number]>('All')
   const [query, setQuery] = useState('')
-  const [properties, setProperties] = useState<Property[]>([])
-  const [threads] = useState<MessageThread[]>([])
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
+  const [properties] = useState<Property[]>(seedProperties)
+  const [threads] = useState<MessageThread[]>(seedThreads)
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(seedProperties[0])
 
-  const filtered = useMemo(() => {
-    return properties.filter((property) => {
-      const categoryPass =
-        selectedCategory === 'All' ||
-        property.type.toLowerCase() === selectedCategory.toLowerCase().replace('s', '')
-      const queryPass =
-        !query ||
-        property.title.toLowerCase().includes(query.toLowerCase()) ||
-        property.location.toLowerCase().includes(query.toLowerCase())
-      return categoryPass && queryPass
-    })
-  }, [properties, selectedCategory, query])
+  const filtered = useMemo(
+    () =>
+      properties.filter((property) => {
+        const categoryPass = selectedCategory === 'All' || property.type.toLowerCase() === selectedCategory.toLowerCase().replace('s', '')
+        const queryPass = !query || property.title.toLowerCase().includes(query.toLowerCase()) || property.location.toLowerCase().includes(query.toLowerCase())
+        return categoryPass && queryPass
+      }),
+    [properties, selectedCategory, query],
+  )
 
   const submitProperty = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
-
     const payload = {
       title: form.get('title'),
       description: form.get('description'),
@@ -71,126 +109,59 @@ export function App() {
       body: JSON.stringify(payload),
       headers: { 'Content-Type': 'application/json' },
     })
-
     event.currentTarget.reset()
   }
 
-  if (selectedProperty) {
-    return <PropertyDetails property={selectedProperty} onBack={() => setSelectedProperty(null)} />
-  }
+  if (selectedProperty) return <PropertyDetails property={selectedProperty} onClose={() => setSelectedProperty(null)} />
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <h1>Rentra Homes</h1>
-        <button className="icon-btn" aria-label="Notifications">🔔</button>
-      </header>
-
+    <main className="app-shell">
+      <header className="app-header"><button>☰</button><h1>UrbanRent</h1><button>✕</button></header>
       {activeTab === 'home' && (
         <section className="screen">
-          <label className="search-box">
-            <span>🔍</span>
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by location or property"
-            />
-            <span>⚙️</span>
-          </label>
-
-          <div className="chips">
-            {categories.map((category) => (
-              <button
-                key={category}
-                className={selectedCategory === category ? 'chip active' : 'chip'}
-                onClick={() => setSelectedCategory(category)}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-
-          <div className="property-grid">
-            {filtered.map((property) => (
-              <button key={property.id} className="card" onClick={() => setSelectedProperty(property)}>
-                <img src={property.images[0]} alt={property.title} className="card-image" />
-                <div className="card-body">
-                  <h3>{property.title}</h3>
-                  <p>{property.location}</p>
-                  <strong>${property.price.toLocaleString()}/month</strong>
-                  <small>
-                    {property.bedrooms} Beds · {property.bathrooms} Baths · {property.furnished}
-                  </small>
-                </div>
-              </button>
-            ))}
-            {!filtered.length && (
-              <div className="empty-state">
-                <h2>No properties yet</h2>
-                <p>Connect your backend and publish your first real listing.</p>
-              </div>
-            )}
-          </div>
+          <label className="search-box"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search location or property" /></label>
+          <div className="chips">{categories.map((category) => <button key={category} onClick={() => setSelectedCategory(category)} className={selectedCategory === category ? 'chip active' : 'chip'}>{category}</button>)}</div>
+          <div className="property-grid">{filtered.map((property) => <button className="listing-card" key={property.id} onClick={() => setSelectedProperty(property)}><img src={property.images[0]} alt={property.title} /><div><h3>{property.title}</h3><p>{property.location}</p><strong>${property.price.toLocaleString()} / month</strong></div></button>)}</div>
         </section>
       )}
-
-      {activeTab === 'add' && <AddProperty submitProperty={submitProperty} />}
       {activeTab === 'messages' && <Messages threads={threads} />}
+      {activeTab === 'add' && <AddProperty submitProperty={submitProperty} />}
 
-      <nav className="bottom-nav">
-        {tabs.map((tab) => (
-          <button key={tab} className={tab === 'add' ? 'nav-item highlighted' : 'nav-item'} onClick={() => setActiveTab(tab)}>
-            {tab === 'add' ? 'Add Property' : tab[0].toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </nav>
+      <nav className="bottom-nav">{tabs.map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={activeTab === tab ? 'active' : ''}>{tab === 'add' ? '+ Add' : tab}</button>)}</nav>
     </main>
   )
 }
 
-function PropertyDetails({ property, onBack }: { property: Property; onBack: () => void }) {
+function PropertyDetails({ property, onClose }: { property: Property; onClose: () => void }) {
   return (
-    <section className="details-screen">
-      <button onClick={onBack} className="back-btn">← Back</button>
-      <div className="gallery">{property.images.map((image) => <img key={image} src={image} alt={property.title} />)}</div>
-      <div className="detail-body">
+    <section className="detail-screen">
+      <header className="app-header"><button>☰</button><h1>UrbanRent</h1><button onClick={onClose}>✕</button></header>
+      <img className="hero" src={property.images[0]} alt={property.title} />
+      <article className="detail-card">
         <h2>{property.title}</h2>
-        <p>{property.location}</p>
-        <h3>${property.price.toLocaleString()}/month</h3>
-        <div className="meta-row">
-          <span>{property.bedrooms} Bedrooms</span>
-          <span>{property.bathrooms} Bathrooms</span>
-          <span>{property.furnished}</span>
-        </div>
+        <p className="muted">📍 {property.location}</p>
+        <p className="price">${property.price.toLocaleString()} <span>/ MONTH</span></p>
+        <div className="facts"><span>{property.bedrooms} Bed</span><span>{property.bathrooms} Bath</span><span>{property.furnished}</span><span>{property.type}</span></div>
         <p>{property.description}</p>
-        <iframe
-          title="Property location"
-          src={`https://www.google.com/maps?q=${encodeURIComponent(property.location)}&output=embed`}
-        />
-      </div>
-      <div className="floating-actions">
-        <a className="whatsapp-btn" href={`https://wa.me/${property.landlordPhoneE164.replace('+', '')}`}>WhatsApp</a>
-        <button className="message-btn">Message</button>
-      </div>
+        <h3>Location</h3>
+        <iframe title="Property location" src={`https://www.google.com/maps?q=${encodeURIComponent(property.location)}&output=embed`} />
+      </article>
+      <div className="floating-actions"><a href={`https://wa.me/${property.landlordPhoneE164.replace('+', '')}`}>WhatsApp</a><button>Message</button></div>
     </section>
   )
 }
 
 function AddProperty({ submitProperty }: { submitProperty: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   return (
-    <section className="screen">
+    <section className="screen add-screen">
       <h2>Add Property</h2>
       <form className="add-form" onSubmit={submitProperty}>
-        <label>Images<input name="images" type="file" multiple accept="image/*" /></label>
-        <label>Title<input name="title" required /></label>
-        <label>Description<textarea name="description" required rows={4} /></label>
-        <label>Price<input name="price" required type="number" min={1} /></label>
+        <label className="upload">Photos<input name="images" type="file" multiple accept="image/*" /><span>Click or drag photos here</span></label>
+        <label>Property Title<input name="title" required placeholder="e.g. Modern Loft in Downtown" /></label>
+        <label>Monthly Rent ($)<input name="price" required type="number" min={1} placeholder="2,500" /></label>
+        <label>Property Type<select name="type" required><option>Apartment</option><option>House</option><option>Studio</option><option>Short Let</option></select></label>
         <label>Location<input name="location" required /></label>
-        <label>Property Type
-          <select name="type" required>
-            <option>Apartment</option><option>House</option><option>Studio</option><option>Short Let</option>
-          </select>
-        </label>
+        <label>Description<textarea name="description" required rows={4} /></label>
         <button type="submit" className="primary">Publish Property</button>
       </form>
     </section>
@@ -201,18 +172,14 @@ function Messages({ threads }: { threads: MessageThread[] }) {
   return (
     <section className="screen">
       <h2>Messages</h2>
-      <div className="threads">
+      <div className="message-list">
         {threads.map((thread) => (
-          <article className="thread" key={thread.id}>
+          <article key={thread.id} className={`thread ${thread.unread ? 'unread' : ''}`}>
             <img src={thread.propertyImage} alt={thread.propertyTitle} />
-            <div>
-              <strong>{thread.propertyTitle}</strong>
-              <p>{thread.lastMessage}</p>
-            </div>
+            <div><h4>{thread.propertyTitle}</h4><p>{thread.lastMessage}</p></div>
             <time>{thread.updatedAt}</time>
           </article>
         ))}
-        {!threads.length && <p className="empty-copy">No conversations yet.</p>}
       </div>
     </section>
   )
